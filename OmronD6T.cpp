@@ -4,48 +4,20 @@
 // Note: D6T's I2C clock maximum freq. = 100kHz
 
 #include "OmronD6T.h"
-#include "Wire.h"
-
-#ifdef ARDUINO_ARCH_AVR
-#endif
-/*
-extern "C" {
-  #include <stdlib.h>
-  #include <string.h>
-  #include <inttypes.h>
-  #include "utility/twi.h"
-}
-#endif
-*/
-
-#define I2C_ADDR_D6T 0x0a
-#define CMD 0x4c
-
-OmronD6T::OmronD6T()
-{
-  Wire.begin();
-}
-
-void OmronD6T::scanTemp() {
-  uint8_t buf[35];
-  int value;
-
-  Wire.beginTransmission(I2C_ADDR_D6T);
-  Wire.write(CMD);
-  Wire.endTransmission();
-
-  int i = 0;
-  Wire.requestFrom(I2C_ADDR_D6T, 35);
-  while (Wire.available() && i < 35){
-    buf[i++] = Wire.read();
+static unsigned char  calc_crc( unsigned char  data ) {
+  int  index;
+  unsigned char  temp;
+  for(index=0;index<8;index++){
+    temp = data;
+    data <<= 1;
+    if(temp & 0x80) data ^= 0x07;
   }
-  Wire.endTransmission();
-  for (int y = 0; y < 4; y++) {
-    for (int x = 0; x < 4; x++) {
-      i = x + (y * 4);
-      value = buf[(i * 2 + 2)] + (buf[(i * 2 + 3)] << 8);
-      temp[y][x] = value * 0.1;
-    }
-  }
+  return data;
 }
-
+bool  D6T_checkPEC( const unsigned char  *buff , int pPEC ){
+  unsigned char  crc = calc_crc( 0x15);
+  for(int i=0;i<pPEC;i++){
+    crc = calc_crc( buff[i] ^ crc );
+  }
+  return (crc == buff[pPEC]);
+}
